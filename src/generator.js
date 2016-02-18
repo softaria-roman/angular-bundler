@@ -47,7 +47,7 @@ config.js.forEach(function(jsConfig, index) {
     })
 });
 
-fs.writeFileSync('angular-module-whatever/generated.json', JSON.stringify(modules));
+fs.writeFileSync('generated.json', JSON.stringify(modules));
 
 // Write js imports to config's html files according to build modules structure and list of static imports
 config.html.forEach(function(path) {
@@ -127,7 +127,7 @@ localModules.forEach(function(moduleName) {
 });
 graph += "\n}";
 
-fs.writeFileSync('angular-module-whatever/generated.dot', graph);
+fs.writeFileSync('generated.dot', graph);
 
 function validateConfig(config) {
     if (!config) {
