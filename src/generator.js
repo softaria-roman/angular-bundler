@@ -9,6 +9,8 @@ var importsStartLabel = '<!-- angular-module-generator begin -->';
 var importsEndLabel = '<!-- angular-module-generator end -->';
 var importTemplate = '<script type="text/javascript" src="$"></script>';
 var moduleCommentTemplate = '<!-- module $ -->';
+var staticImportsStartLabel = '<!-- static imports [$] begin -->';
+var staticImportsEndLabel = '<!-- static imports [$] end -->';
 
 var configPath = process.argv[2];
 if (!configPath || !fs.existsSync(configPath)) {
@@ -49,13 +51,15 @@ config.js.forEach(function(jsConfig, index) {
 
 fs.writeFileSync('generated.json', JSON.stringify(modules));
 
-// Write js imports to config's html files according to build modules structure and list of static imports
+// Write non-static js imports to config's html files according to build modules structure
+// and list of static imports according to provided labels (if any)
 config.html.forEach(function(path) {
     var file = fs.readFileSync(path) + '';
-    var mainModuleName = file.match(/ng-app="(.*?)"/)[1];
-    if (!mainModuleName) {
+    var mainModuleMatch = file.match(/ng-app="(.*?)"/);
+    if (!mainModuleMatch || !mainModuleMatch[1]) {
         throw Error("ng-app declaration was not found in file " + path);
     }
+    var mainModuleName = mainModuleMatch[1];
 
     var mainModule = modules[mainModuleName];
     if (!mainModule) {
@@ -72,20 +76,8 @@ config.html.forEach(function(path) {
 
     var mainModuleImports = formatImports(mainModule.files);
 
-    var staticImports = config.static.reduce(function(prev, staticConfig) {
-        if (typeof staticConfig === 'string') {
-            return prev + formatImports([staticConfig]) + '\n\n';
-        } else if (staticConfig instanceof Object) {
-            var comment = Object.keys(staticConfig)[0];
-            return prev +
-                   '<!-- ' + comment + ' -->' +
-                   '\n' +
-                   formatImports(util.isArray(staticConfig[comment]) ? staticConfig[comment] : [staticConfig[comment]]) +
-                   '\n\n';
-        } else {
-            throw Error("Unrecognized format for static import " + staticConfig.toString());
-        }
-    }, '');
+    var staticImports = collectStaticImports(config);
+    var isStaticImportsSimple = typeof staticImports === 'string';
 
     var importsStart = file.indexOf(importsStartLabel);
     var importsEnd = file.indexOf(importsEndLabel);
@@ -95,16 +87,36 @@ config.html.forEach(function(path) {
 
     file = file.substring(0, importsStart + importsStartLabel.length) +
            '\n' +
-           "<!-- static imports -->" +
-           '\n' +
-           staticImports +
-           '\n' +
+           (isStaticImportsSimple ? staticImports + '\n' : '') +
            dependenciesImports +
            moduleCommentTemplate.replace('$', mainModuleName) +
            '\n' +
            mainModuleImports +
            '\n' +
            file.substring(importsEnd);
+
+    if (!isStaticImportsSimple) {
+        Object.keys(staticImports).forEach(function(tag) {
+            var startLabel = staticImportsStartLabel.replace('$', tag);
+            var start = file.indexOf(startLabel);
+            if (start <= 0) {
+                throw Error("Imports label (" + startLabel + ") was not found in file " + path);
+            }
+
+            var endLabel = staticImportsEndLabel.replace('$', tag);
+            var end = file.indexOf(endLabel);
+            if (end <= 0) {
+                throw Error("Imports label (" + endLabel + ") was not found in file " + path);
+            }
+
+            file = file.substring(0, start + startLabel.length) +
+                   '\n' +
+                   staticImports[tag] +
+                   '\n' +
+                   file.substring(end);
+
+        })
+    }
 
     fs.writeFileSync(path, file);
 });
@@ -241,10 +253,48 @@ function dropDuplicates(element, index, array) {
 }
 
 /**
+ * @param config {GeneratorConfig}
+ * @returns {string | Object<string, string>}
+ */
+function collectStaticImports(config) {
+    if (util.isArray(config.static)) {
+        return collectList(config.static);
+    } else if (config.static instanceof Object) {
+        return Object.keys(config.static).reduce(function(prev, key) {
+            var list = config.static[key];
+            if (!util.isArray(list)) {
+                throw Error("Wrong 'static' format - expected array in field [" + key + "]");
+            }
+
+            prev[key] = collectList(list);
+
+            return prev;
+        }, {});
+    } else {
+        throw Error("Wrong 'static' format - expected array or object");
+    }
+
+    function collectList(list) {
+        return list.map(function(staticConfig) {
+            if (typeof staticConfig === 'string') {
+                return formatImports([staticConfig]);
+            } else if (staticConfig instanceof Object) {
+                var comment = Object.keys(staticConfig)[0];
+                return '<!-- ' + comment + ' -->' +
+                       '\n' +
+                       formatImports(util.isArray(staticConfig[comment]) ? staticConfig[comment] : [staticConfig[comment]]);
+            } else {
+                throw Error("Unrecognized format for static import " + staticConfig.toString());
+            }
+        }).join('\n\n');
+    }
+}
+
+/**
  * @typedef {Object} GeneratorConfig
  * @property {Array<JsConfig>} js
  * @property {Array<string>} html
- * @property {Array<string | Object<string, string> | Object<string,string[]>>} static
+ * @property {StaticConfig | Object<string, StaticConfig>} static
  */
 
 /**
@@ -257,4 +307,8 @@ function dropDuplicates(element, index, array) {
  * @typedef {Object} ModuleConfig
  * @property {string[]} deps
  * @property {string[]} files
+ */
+
+/**
+ * @typedef {Array<string | Object<string, string> | Object<string,string[]>>} StaticConfig
  */

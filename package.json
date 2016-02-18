@@ -11,6 +11,12 @@
         "glob": "*"
     },
     "engines": {
-        "node": ">=0.12.0"
+        "node": ">=0.10.0"
+    },
+    "files": [
+        "src"
+    ],
+    "scripts": {
+        "test": "node src/generator.js test/test-config.json"
     }
 }
