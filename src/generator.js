@@ -54,6 +54,11 @@ config.js.forEach(function(jsConfig, index) {
 });
 
 fs.writeFileSync('generated.json', JSON.stringify(modules));
+console.log("Collected " +
+            Object.keys(modules).length +
+            " modules with total size " +
+            Object.keys(modules).reduce(function(prev, m) { return prev + modules[m].size }, 0) +
+            "KB");
 
 // Write non-static js imports to config's html files according to build modules structure
 // and list of static imports according to provided labels (if any)
