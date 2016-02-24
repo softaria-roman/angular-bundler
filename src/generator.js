@@ -43,6 +43,8 @@ config.js.forEach(function(jsConfig, index) {
             .replace(jsConfig.dir, jsConfig.serverPrefix)
             .replace('//', '/');
 
+        context.generatorFilesize = Math.ceil(fs.statSync(filename).size / 1024.0);
+
         try {
             vm.runInContext(file, context);
         } catch (e) {
@@ -177,7 +179,7 @@ function buildAngularModuleSandbox(modules) {
     var sandbox = {};
     sandbox.angular = {};
     sandbox.angular.module = function(name, deps) {
-        var module = modules[name] || (modules[name] = {deps: [], files: []});
+        var module = modules[name] || (modules[name] = {deps: [], files: [], size: 0});
 
         if (deps) {
             module.deps = deps;
@@ -189,6 +191,8 @@ function buildAngularModuleSandbox(modules) {
             } else {
                 module.files.push(sandbox.generatorFilename);
             }
+
+            module.size += sandbox.generatorFilesize;
         }
 
         return sandbox.angular.module;
@@ -319,6 +323,7 @@ function collectStaticImports(config) {
  * @typedef {Object} ModuleConfig
  * @property {string[]} deps
  * @property {string[]} files
+ * @property {number} size
  */
 
 /**
