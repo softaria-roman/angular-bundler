@@ -7,10 +7,12 @@ var vm = require('vm');
 
 var importsStartLabel = '<!-- angular-module-generator begin -->';
 var importsEndLabel = '<!-- angular-module-generator end -->';
-var importTemplate = '<script type="text/javascript" src="$"></script>';
+var importTemplate = '<script$async type="text/javascript" src="$src"></script>';
 var moduleCommentTemplate = '<!-- module $ -->';
 var staticImportsStartLabel = '<!-- static imports [$] begin -->';
 var staticImportsEndLabel = '<!-- static imports [$] end -->';
+
+var asyncFileFlag = '+async';
 
 var configPath = process.argv[2];
 if (!configPath || !fs.existsSync(configPath)) {
@@ -228,7 +230,17 @@ function buildAngularModuleSandbox(modules) {
  */
 function formatImports(files) {
     return files.map(function(file) {
-        return importTemplate.replace('$', file)
+        var template = importTemplate;
+
+        var asyncFlag = file.indexOf(asyncFileFlag) >= 0;
+        if (asyncFlag) {
+            file = file.replace(asyncFileFlag, '');
+            template = template.replace('$async', ' async');
+        } else {
+            template = template.replace('$async', '');
+        }
+
+        return template.replace('$src', file);
     }).join('\n')
 }
 

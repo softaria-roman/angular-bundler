@@ -16,7 +16,8 @@
             },
             {
                 "Vendor 3": [
-                    "test/vendor/vendor3.js"
+                    "test/vendor/vendor3.js",
+                    "test/vendor/vendor4.js+async"
                 ]
             }
         ],
