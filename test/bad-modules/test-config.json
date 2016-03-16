@@ -1,0 +1,13 @@
+{
+    "js": [
+        {
+            "dir": "test/bad-modules",
+            "mapping": ["test/bad-modules", "/testPrefix"]
+        }
+    ],
+    "html": [
+        "test/bad-modules/test.html"
+    ],
+    "static": {
+    }
+}

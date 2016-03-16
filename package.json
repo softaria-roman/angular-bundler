@@ -15,8 +15,5 @@
     },
     "files": [
         "src"
-    ],
-    "scripts": {
-        "test": "node src/generator.js test/test-config.json"
-    }
+    ]
 }
