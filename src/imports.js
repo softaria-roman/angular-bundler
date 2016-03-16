@@ -46,11 +46,11 @@
             .map(function(depName) {
                 return moduleCommentTemplate.replace('$', depName) +
                        '\n' +
-                       formatImports(modulesStructure.modules[depName].files) +
+                       formatImports(sortModuleFiles(modulesStructure.modules[depName].files)) +
                        '\n';
             }).join('\n');
 
-        var mainModuleImports = formatImports(mainModule.files);
+        var mainModuleImports = formatImports(sortModuleFiles(mainModule.files));
 
         var staticImports = collectStaticImports(staticImportsConfig);
         var isStaticImportsSimple = typeof staticImports === 'string';
@@ -115,6 +115,14 @@
 
                 return template.replace('$src', file);
             }).join('\n')
+        }
+
+        function sortModuleFiles(files) {
+            var head = files[0]; // keep definition first
+            var tail = files.slice(1);
+            tail.sort();
+
+            return [head].concat(tail);
         }
 
         /**
