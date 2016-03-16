@@ -256,15 +256,25 @@
         };
 
         sandbox.angular.module.provider = function(name, constructor) {
+            var isArrayConstructor = util.isArray(constructor);
+            if (isArrayConstructor) {
+                validateConstructor(name + 'Provider', constructor);
+            }
+
+            var serviceConstructor = isArrayConstructor ? constructor[constructor.length - 1] : constructor;
+
             try {
-                var constructed = new constructor();
+                var constructed = new serviceConstructor();
             } catch (e) {
-                console.error("Unable to create provider in file " + getFileNameFn() + ". Possible name is " + name);
+                console.error("Unable to create provider in file " + getFileNameFn() + ". Possible name is " + name + '. Error: ' + e);
                 return;
             }
 
             if (!constructed.$get) {
                 console.error("Provider " + name + " is missing $get field");
+                return;
+            } else if (Object.keys(constructed.$get).length === 0) {
+                // provider not creating service explicitly
                 return;
             }
 
