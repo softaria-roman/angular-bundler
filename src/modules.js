@@ -302,7 +302,10 @@
         return vm.createContext(sandbox);
 
         function validateConstructor(name, constructor) {
-            if (!util.isArray(constructor)) {
+            var isArrayMinifyReadyConstructor = util.isArray(constructor);
+            var isFunctionMinifyReadyConstructor = (typeof constructor === 'function') && constructor.length === 0;
+
+            if (!isArrayMinifyReadyConstructor && !isFunctionMinifyReadyConstructor) {
                 console.error("Some provider in file " + getFileNameFn() + " is not minify-ready. Possible name is " + name);
                 return;
             }
@@ -320,7 +323,7 @@
 
             var config = new ProviderConfig();
             config.name = name;
-            config.injects = constructor.slice(0, constructor.length - 1);
+            config.injects = isArrayMinifyReadyConstructor ? constructor.slice(0, constructor.length - 1) : [];
             module.providers.push(config);
         }
     }

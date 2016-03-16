@@ -42,7 +42,8 @@
             throw Error("Module " + mainModuleName + " declared in file " + filePath + " was not found");
         }
 
-        var dependenciesImports = modules.resolveDependencies(mainModuleName, modulesStructure)
+        var dependencies = modules.resolveDependencies(mainModuleName, modulesStructure);
+        var dependenciesImports = dependencies
             .map(function(depName) {
                 return moduleCommentTemplate.replace('$', depName) +
                        '\n' +
@@ -96,6 +97,12 @@
         }
 
         fs.writeFileSync(filePath, file);
+
+        var dependenciesSize = mainModule.size +
+                               dependencies.reduce(function(prev, dep) {
+                                   return prev + modulesStructure.modules[dep].size
+                               }, 0);
+        console.log("App " + mainModuleName + " has " + dependenciesSize + "KB of non-static imports");
 
         /**
          * @param files {string[]}
