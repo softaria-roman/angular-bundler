@@ -64,7 +64,7 @@
             console.warn("Found circular reference: " + circular.join(' -> '));
         }
         if (injectsErrors.length > 0) {
-            console.warn(injectsErrors[0]);
+            injectsErrors.forEach(console.warn);
         }
     }
 
