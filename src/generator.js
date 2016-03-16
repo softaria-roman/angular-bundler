@@ -20,13 +20,18 @@
     });
     // replace real fs paths of modules files with server ones during modules collection
     var filenameMapper = function(filename, dir) {
-        var replacement = config.js.filter(function(jsConfig) {
+        var dirConfig = config.js.filter(function(jsConfig) {
             return jsConfig.dir === dir
-        })[0].mapping;
+        });
 
-        return filename
-            .replace(replacement[0], replacement[1])
-            .replace(/\/\//, '/');
+        if (dirConfig && dirConfig.length === 1) {
+            var replacement = dirConfig[0].mapping;
+            return filename
+                .replace(replacement[0], replacement[1])
+                .replace(/\/\//, '/');
+        } else {
+            return filename;
+        }
     };
     var modulesStructure = modulesBuilder.buildModulesStructure(directories, filenameMapper, true, true);
 
@@ -37,12 +42,12 @@
                 Object.keys(modulesStructure.modules).reduce(function(prev, m) { return prev + modulesStructure.modules[m].size }, 0) +
                 "KB");
 
+    var graph = modulesBuilder.buildDOTDiagram(modulesStructure);
+    fs.writeFileSync('generated.dot', graph);
+
     config.html.forEach(function(htmlFilePath) {
         importsWriter.writeImports(htmlFilePath, modulesStructure, config.static);
     });
-
-    var graph = modulesBuilder.buildDOTDiagram(modulesStructure);
-    fs.writeFileSync('generated.dot', graph);
 
     function validateConfig(config) {
         if (!config) {

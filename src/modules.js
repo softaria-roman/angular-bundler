@@ -32,14 +32,13 @@
             var filenames = glob.sync(pattern);
             console.log("Process path [" + dir + "], found " + filenames.length + " js files");
 
-            var context = vm.createContext(angularModuleSandbox);
             filenames.forEach(function(filename) {
                 var file = fs.readFileSync(filename) + '';
                 currentFileName = filePathMapper ? filePathMapper(filename, dir) : filename;
                 currentFileSize = Math.ceil(fs.statSync(filename).size / 1024.0);
 
                 try {
-                    vm.runInContext(file, context);
+                    vm.runInContext(file, angularModuleSandbox);
                 } catch (e) {
                     // do nothing - we are interested only in angular.module calls
                 }
@@ -61,8 +60,13 @@
                 module.providers.forEach(function(provider) {
                     provider.injects.forEach(function(inject) {
                         var moduleDependency = moduleByProvider[inject];
+                        var invalidInject = moduleDependency &&
+                                            moduleDependency !== moduleName &&
+                                            !module.dependencies.some(function(depName) {
+                                                return depName === moduleDependency
+                                            });
 
-                        if (moduleDependency && !module.deps.some(function(depName) { return depName === moduleDependency })) {
+                        if (invalidInject) {
                             console.error("Module " + moduleName + " have provider " + provider.name + " which injects " + inject + " defined in " +
                                           moduleDependency + ", but module " + moduleName + " do not depends on module " + moduleDependency + " explicitly");
                         }
@@ -91,7 +95,7 @@
 
         // build edges declaration
         localModules.forEach(function(moduleName) {
-            modulesStructure.modules[moduleName].deps.forEach(function(dep) {
+            modulesStructure.modules[moduleName].dependencies.forEach(function(dep) {
                 if (localModules.indexOf(dep) >= 0) {
                     graph += '\t"' + moduleName + '" -> ' + '"' + dep + '";\n';
                 }
@@ -109,19 +113,71 @@
         this.modules = {};
 
         /**
-         * @param moduleNames {string[]}
+         * @param moduleName {string}
          */
-        this.resolveDependencies = function(moduleNames) {
-            return moduleNames.reduce(function(prev, dep) {
-                if (self.modules[dep]) {
-                    prev = prev.concat(self.resolveDependencies(self.modules[dep].deps));
-                    prev.push(dep);
-                }
+        this.resolveDependencies = function(moduleName) {
+            var circular = self.findCircularReference();
+            if (circular) {
+                throw Error("Found circular reference: " + circular.join(' -> '));
+            }
 
-                return prev;
-            }, []).filter(function dropDuplicates(element, index, array) {
-                return index === array.indexOf(element);
-            });
+            return doResolve(moduleName);
+
+            function doResolve(moduleName) {
+                return self.modules[moduleName].dependencies.reduce(function(prev, dep) {
+                    if (self.modules[dep]) {
+                        prev = prev.concat(doResolve(dep));
+                        prev.push(dep);
+                    }
+
+                    return prev;
+                }, []).filter(function dropDuplicates(element, index, array) {
+                    return index === array.indexOf(element);
+                });
+            }
+        };
+
+        /**
+         * @returns {string[]}
+         */
+        this.findCircularReference = function() {
+            var modules = Object.keys(self.modules);
+
+            for (var i = 0; i < modules.length; i++) {
+                try {
+                    doFind(modules[i], []);
+                } catch (e) {
+                    if (e instanceof CRef) {
+                        return e.trail;
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+
+            /**
+             * @param module {string}
+             * @param trail {string[]}
+             */
+            function doFind(module, trail) {
+                if (trail.indexOf(module) >= 0) {
+                    throw new CRef(trail.concat(module));
+                } else {
+                    var deps = self.modules[module].dependencies;
+
+                    if (deps.length > 0) {
+                        deps.forEach(function(dep) {
+                            if (self.modules[dep]) {
+                                doFind(dep, trail.concat(module));
+                            }
+                        })
+                    }
+                }
+            }
+
+            function CRef(trail) {
+                this.trail = trail;
+            }
         }
     }
 
@@ -129,7 +185,7 @@
         /**
          * @type {string[]}
          */
-        this.deps = [];
+        this.dependencies = [];
 
         /**
          * @type {string[]}
@@ -171,15 +227,15 @@
         var currentModuleName = null;
 
         sandbox.angular = {};
-        sandbox.angular.module = function(name, deps) {
+        sandbox.angular.module = function(name, dependencies) {
             var module = modulesStructure.modules[name] || (modulesStructure.modules[name] = new ModuleConfig());
 
-            if (deps) {
-                module.deps = deps;
+            if (dependencies) {
+                module.dependencies = dependencies;
             }
 
             if (module.files.indexOf(getFileNameFn()) < 0) {
-                if (deps) { //module declaration - put it before other module's files
+                if (dependencies) { //module declaration - put it before other module's files
                     module.files = [getFileNameFn()].concat(module.files);
                 } else {
                     module.files.push(getFileNameFn());
@@ -194,7 +250,12 @@
         };
 
         sandbox.angular.module.provider = function(name, constructor) {
-            var constructed = new constructor();
+            try {
+                var constructed = new constructor();
+            } catch (e) {
+                throw Error("Unable to create provider in file " + getFileNameFn() + ". Possible name is " + name);
+            }
+
             if (!constructed.$get) {
                 throw Error("Provider " + name + " is missing $get field");
             }
@@ -230,12 +291,12 @@
             return sandbox.angular.module;
         };
 
-        return sandbox;
+        return vm.createContext(sandbox);
 
         function validateConstructor(name, constructor) {
             if (validateProviderConstructor) {
                 if (!util.isArray(constructor)) {
-                    throw Error(name + " is not minify-ready");
+                    throw Error("Some provider in file " + getFileNameFn() + " is not minify-ready. Possible name is " + name);
                 }
 
                 if (!currentModuleName) {

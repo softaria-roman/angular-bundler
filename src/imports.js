@@ -42,7 +42,7 @@
             throw Error("Module " + mainModuleName + " declared in file " + filePath + " was not found");
         }
 
-        var dependenciesImports = modulesStructure.resolveDependencies(mainModule.deps)
+        var dependenciesImports = modulesStructure.resolveDependencies(mainModuleName)
             .reduce(function(prev, depName) {
                 return prev +
                        moduleCommentTemplate.replace('$', depName) +
