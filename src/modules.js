@@ -1,6 +1,6 @@
 'use strict';
 
-(function(){
+(function() {
     var glob = require('glob');
     var vm = require('vm');
     var fs = require('fs');
@@ -13,17 +13,14 @@
      * Read all js files from given directories and build modules structure.
      * @param dirs {string[]} directories containig .js files to look for modules/providers/... declarations
      * @param filePathMapper {function(string, string):string=} function that maps given filename in given directory to new filename which is saved in structure
-     * @param validateProviderConstructor {boolean} if true, will check that all provider/factory/service/... declarations are minify-ready
-     * @param validateDependencies {boolean} if true, will check that if provider/factory/serivce/... injects service, then provider's module <b>explicitly</b>
      * depends on injected service's module; <i>validateProviderConstructor == false</i> disables this check
      * @returns {ModulesStructure} modules description by names
      */
-    exports.buildModulesStructure = function(dirs, filePathMapper, validateProviderConstructor, validateDependencies) {
+    exports.buildModulesStructure = function(dirs, filePathMapper) {
         var modulesStructure = new ModulesStructure();
 
         var currentFileName, currentFileSize;
         var angularModuleSandbox = buildAngularModuleSandbox(modulesStructure,
-                                                             validateProviderConstructor,
                                                              function() { return currentFileName },
                                                              function() { return currentFileSize });
 
@@ -44,36 +41,6 @@
                 }
             })
         });
-
-        if (validateProviderConstructor && validateDependencies) {
-            var moduleByProvider = Object.keys(modulesStructure.modules).reduce(function(prev, moduleName) {
-                modulesStructure.modules[moduleName].providers.forEach(function(provider) {
-                    prev[provider.name] = moduleName;
-                });
-
-                return prev;
-            }, {});
-
-            Object.keys(modulesStructure.modules).forEach(function(moduleName) {
-                var module = modulesStructure.modules[moduleName];
-
-                module.providers.forEach(function(provider) {
-                    provider.injects.forEach(function(inject) {
-                        var moduleDependency = moduleByProvider[inject];
-                        var invalidInject = moduleDependency &&
-                                            moduleDependency !== moduleName &&
-                                            !module.dependencies.some(function(depName) {
-                                                return depName === moduleDependency
-                                            });
-
-                        if (invalidInject) {
-                            console.error("Module " + moduleName + " have provider " + provider.name + " which injects " + inject + " defined in " +
-                                          moduleDependency + ", but module " + moduleName + " do not depends on module " + moduleDependency + " explicitly");
-                        }
-                    });
-                })
-            })
-        }
 
         return modulesStructure;
     };
@@ -106,79 +73,119 @@
         return graph;
     };
 
-    function ModulesStructure() {
-        var self = this;
+    /**
+     * @param modulesStructure {ModulesStructure}
+     * @returns {string[]}
+     */
+    exports.validateInjects = function(modulesStructure) {
+        var moduleByProvider = Object.keys(modulesStructure.modules).reduce(function(prev, moduleName) {
+            modulesStructure.modules[moduleName].providers.forEach(function(provider) {
+                prev[provider.name] = moduleName;
+            });
 
-        /** @type {Object<string, ModuleConfig>} */
-        this.modules = {};
+            return prev;
+        }, {});
 
-        /**
-         * @param moduleName {string}
-         */
-        this.resolveDependencies = function(moduleName) {
-            var circular = self.findCircularReference();
-            if (circular) {
-                throw Error("Found circular reference: " + circular.join(' -> '));
-            }
+        var errors = [];
 
-            return doResolve(moduleName);
+        Object.keys(modulesStructure.modules).forEach(function(moduleName) {
+            var module = modulesStructure.modules[moduleName];
 
-            function doResolve(moduleName) {
-                return self.modules[moduleName].dependencies.reduce(function(prev, dep) {
-                    if (self.modules[dep]) {
-                        prev = prev.concat(doResolve(dep));
-                        prev.push(dep);
+            module.providers.forEach(function(provider) {
+                provider.injects.forEach(function(inject) {
+                    var moduleDependency = moduleByProvider[inject];
+                    var invalidInject = moduleDependency &&
+                                        moduleDependency !== moduleName && !module.dependencies.some(function(depName) {
+                            return depName === moduleDependency
+                        });
+
+                    if (invalidInject) {
+                        errors.push("Module " + moduleName + " have provider " + provider.name + " which injects " + inject + " defined in " +
+                                    moduleDependency + ", but module " + moduleName + " do not depends on module " + moduleDependency + " explicitly");
                     }
-
-                    return prev;
-                }, []).filter(function dropDuplicates(element, index, array) {
-                    return index === array.indexOf(element);
                 });
-            }
-        };
+            })
+        });
 
-        /**
-         * @returns {string[]}
-         */
-        this.findCircularReference = function() {
-            var modules = Object.keys(self.modules);
+        return errors;
+    };
 
-            for (var i = 0; i < modules.length; i++) {
-                try {
-                    doFind(modules[i], []);
-                } catch (e) {
-                    if (e instanceof CRef) {
-                        return e.trail;
-                    } else {
-                        throw e;
+    /**
+     *
+     * @param moduleName {strict}
+     * @param modulesStructure {ModulesStructure}
+     * @returns {strict[]}
+     */
+    exports.resolveDependencies = function(moduleName, modulesStructure) {
+        var result = [];
+        doResolve([moduleName], result);
+        return result;
+
+        function doResolve(moduleNames, result) {
+            moduleNames.forEach(function(depName) {
+                var dep = modulesStructure.modules[depName];
+
+                if (dep) {
+                    var uniqueDeps = dep.dependencies.filter(function(dep) {
+                        return result.indexOf(dep) < 0 && modulesStructure.modules[dep];
+                    });
+
+                    if (uniqueDeps.length > 0) {
+                        Array.prototype.push.apply(result, uniqueDeps);
+                        doResolve(uniqueDeps, result);
                     }
                 }
-            }
+            });
+        }
+    };
 
-            /**
-             * @param module {string}
-             * @param trail {string[]}
-             */
-            function doFind(module, trail) {
-                if (trail.indexOf(module) >= 0) {
-                    throw new CRef(trail.concat(module));
+    /**
+     * @param modulesStructure {ModulesStructure}
+     * @returns {string[]} module names' trail containig circular reference
+     */
+    exports.findCircularReference = function(modulesStructure) {
+        var modules = Object.keys(modulesStructure.modules);
+
+        for (var i = 0; i < modules.length; i++) {
+            try {
+                doFind(modules[i], []);
+            } catch (e) {
+                if (e instanceof CRef) {
+                    return e.trail;
                 } else {
-                    var deps = self.modules[module].dependencies;
-
-                    if (deps.length > 0) {
-                        deps.forEach(function(dep) {
-                            if (self.modules[dep]) {
-                                doFind(dep, trail.concat(module));
-                            }
-                        })
-                    }
+                    throw e;
                 }
-            }
-
-            function CRef(trail) {
-                this.trail = trail;
             }
         }
+
+        /**
+         * @param module {string}
+         * @param trail {string[]}
+         */
+        function doFind(module, trail) {
+            if (trail.indexOf(module) >= 0) {
+                throw new CRef(trail.concat(module));
+            } else {
+                var deps = modulesStructure.modules[module].dependencies;
+
+                if (deps.length > 0) {
+                    deps.forEach(function(dep) {
+                        if (modulesStructure.modules[dep]) {
+                            doFind(dep, trail.concat(module));
+                        }
+                    })
+                }
+            }
+        }
+
+        function CRef(trail) {
+            this.trail = trail;
+        }
+    };
+
+    function ModulesStructure() {
+        /** @type {Object<string, ModuleConfig>} */
+        this.modules = {};
     }
 
     function ModuleConfig() {
@@ -217,12 +224,11 @@
 
     /**
      * @param modulesStructure {ModulesStructure}
-     * @param validateProviderConstructor {boolean}
      * @param getFileNameFn {function():string}
      * @param getFileSizeFn {function():number}
      * @returns {Object}
      */
-    function buildAngularModuleSandbox(modulesStructure, validateProviderConstructor, getFileNameFn, getFileSizeFn) {
+    function buildAngularModuleSandbox(modulesStructure, getFileNameFn, getFileSizeFn) {
         var sandbox = {};
         var currentModuleName = null;
 
@@ -253,11 +259,13 @@
             try {
                 var constructed = new constructor();
             } catch (e) {
-                throw Error("Unable to create provider in file " + getFileNameFn() + ". Possible name is " + name);
+                console.error("Unable to create provider in file " + getFileNameFn() + ". Possible name is " + name);
+                return;
             }
 
             if (!constructed.$get) {
-                throw Error("Provider " + name + " is missing $get field");
+                console.error("Provider " + name + " is missing $get field");
+                return;
             }
 
             validateConstructor(name, constructed.$get);
@@ -294,25 +302,26 @@
         return vm.createContext(sandbox);
 
         function validateConstructor(name, constructor) {
-            if (validateProviderConstructor) {
-                if (!util.isArray(constructor)) {
-                    throw Error("Some provider in file " + getFileNameFn() + " is not minify-ready. Possible name is " + name);
-                }
-
-                if (!currentModuleName) {
-                    throw Error("Provider " + name + " is defined before it's module");
-                }
-
-                var module = modulesStructure.modules[currentModuleName];
-                if (module.providers.some(function(provider) { return provider.name === name })) {
-                    throw Error("Duplicate declaration of " + name);
-                }
-
-                var config = new ProviderConfig();
-                config.name = name;
-                config.injects = constructor.slice(0, constructor.length - 1);
-                module.providers.push(config);
+            if (!util.isArray(constructor)) {
+                console.error("Some provider in file " + getFileNameFn() + " is not minify-ready. Possible name is " + name);
+                return;
             }
+
+            if (!currentModuleName) {
+                console.error("Provider " + name + " is defined before it's module");
+                return;
+            }
+
+            var module = modulesStructure.modules[currentModuleName];
+            if (module.providers.some(function(provider) { return provider.name === name })) {
+                console.error("Duplicate declaration of " + name);
+                return;
+            }
+
+            var config = new ProviderConfig();
+            config.name = name;
+            config.injects = constructor.slice(0, constructor.length - 1);
+            module.providers.push(config);
         }
     }
 }());

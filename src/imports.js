@@ -42,14 +42,13 @@
             throw Error("Module " + mainModuleName + " declared in file " + filePath + " was not found");
         }
 
-        var dependenciesImports = modulesStructure.resolveDependencies(mainModuleName)
-            .reduce(function(prev, depName) {
-                return prev +
-                       moduleCommentTemplate.replace('$', depName) +
+        var dependenciesImports = modules.resolveDependencies(mainModuleName, modulesStructure)
+            .map(function(depName) {
+                return moduleCommentTemplate.replace('$', depName) +
                        '\n' +
                        formatImports(modulesStructure.modules[depName].files) +
-                       '\n\n';
-            }, '');
+                       '\n';
+            }).join('\n');
 
         var mainModuleImports = formatImports(mainModule.files);
 
@@ -66,6 +65,7 @@
                '\n' +
                (isStaticImportsSimple ? staticImports + '\n' : '') +
                dependenciesImports +
+               '\n' +
                moduleCommentTemplate.replace('$', mainModuleName) +
                '\n' +
                mainModuleImports +
