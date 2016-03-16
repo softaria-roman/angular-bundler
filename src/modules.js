@@ -9,14 +9,20 @@
     exports.ModulesStructure = ModulesStructure;
     exports.ProviderConfig = ProviderConfig;
 
-    /**
+    exports.buildModulesStructure = buildModulesStructure;
+    exports.buildDOTDiagram = buildDOTDiagram;
+    exports.validateInjects = validateInjects;
+    exports.resolveDependencies = resolveDependencies;
+    exports.findCircularReference = findCircularReference;
+
+        /**
      * Read all js files from given directories and build modules structure.
      * @param dirs {string[]} directories containig .js files to look for modules/providers/... declarations
      * @param filePathMapper {function(string, string):string=} function that maps given filename in given directory to new filename which is saved in structure
      * depends on injected service's module; <i>validateProviderConstructor == false</i> disables this check
      * @returns {ModulesStructure} modules description by names
      */
-    exports.buildModulesStructure = function(dirs, filePathMapper) {
+    function buildModulesStructure(dirs, filePathMapper) {
         var modulesStructure = new ModulesStructure();
 
         var currentFileName, currentFileSize;
@@ -43,14 +49,14 @@
         });
 
         return modulesStructure;
-    };
+    }
 
     /**
      * Builds modules dependencies DOT diagram. It contains declaration all of graph elements and enumeration of all graph edges.
      * @param modulesStructure {ModulesStructure}
      * @returns {string}
      */
-    exports.buildDOTDiagram = function(modulesStructure) {
+    function buildDOTDiagram(modulesStructure) {
         var graph = 'digraph dependencies {\n';
         var localModules = Object.keys(modulesStructure.modules);
 
@@ -71,13 +77,13 @@
         graph += "\n}";
 
         return graph;
-    };
+    }
 
     /**
      * @param modulesStructure {ModulesStructure}
      * @returns {string[]}
      */
-    exports.validateInjects = function(modulesStructure) {
+    function validateInjects(modulesStructure) {
         var moduleByProvider = Object.keys(modulesStructure.modules).reduce(function(prev, moduleName) {
             modulesStructure.modules[moduleName].providers.forEach(function(provider) {
                 prev[provider.name] = moduleName;
@@ -108,7 +114,7 @@
         });
 
         return errors;
-    };
+    }
 
     /**
      *
@@ -116,34 +122,32 @@
      * @param modulesStructure {ModulesStructure}
      * @returns {strict[]}
      */
-    exports.resolveDependencies = function(moduleName, modulesStructure) {
-        var result = [];
-        doResolve([moduleName], result);
-        return result;
+    function resolveDependencies(moduleName, modulesStructure) {
+        if (findCircularReference(modulesStructure)) {
+            throw Error("Can not build dependency tree - found circular dependency");
+        }
 
-        function doResolve(moduleNames, result) {
-            moduleNames.forEach(function(depName) {
-                var dep = modulesStructure.modules[depName];
+        return doResolve([moduleName]);
 
-                if (dep) {
-                    var uniqueDeps = dep.dependencies.filter(function(dep) {
-                        return result.indexOf(dep) < 0 && modulesStructure.modules[dep];
-                    });
-
-                    if (uniqueDeps.length > 0) {
-                        Array.prototype.push.apply(result, uniqueDeps);
-                        doResolve(uniqueDeps, result);
-                    }
+        function doResolve(deps) {
+            return deps.reduce(function(prev, dep) {
+                if (modulesStructure.modules[dep]) {
+                    prev = prev.concat(doResolve(modulesStructure.modules[dep].dependencies));
+                    prev.push(dep);
                 }
+
+                return prev;
+            }, []).filter(function dropDuplicates(element, index, array) {
+                return index === array.indexOf(element);
             });
         }
-    };
+    }
 
     /**
      * @param modulesStructure {ModulesStructure}
      * @returns {string[]} module names' trail containig circular reference
      */
-    exports.findCircularReference = function(modulesStructure) {
+    function findCircularReference(modulesStructure) {
         var modules = Object.keys(modulesStructure.modules);
 
         for (var i = 0; i < modules.length; i++) {
@@ -181,7 +185,7 @@
         function CRef(trail) {
             this.trail = trail;
         }
-    };
+    }
 
     function ModulesStructure() {
         /** @type {Object<string, ModuleConfig>} */

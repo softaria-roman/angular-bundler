@@ -51,8 +51,6 @@
                        '\n';
             }).join('\n');
 
-        var mainModuleImports = formatImports(sortModuleFiles(mainModule.files));
-
         var staticImports = collectStaticImports(staticImportsConfig);
         var isStaticImportsSimple = typeof staticImports === 'string';
 
@@ -66,11 +64,6 @@
                '\n' +
                (isStaticImportsSimple ? staticImports + '\n' : '') +
                dependenciesImports +
-               '\n' +
-               moduleCommentTemplate.replace('$', mainModuleName) +
-               '\n' +
-               mainModuleImports +
-               '\n' +
                file.substring(importsEnd);
 
         if (!isStaticImportsSimple) {

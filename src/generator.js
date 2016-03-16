@@ -10,15 +10,20 @@
      * @enum {string}
      */
     var OPTIONS = {
-        validateOnly: 'validate-only'
+        validateOnly: 'validate-only',
+        validateInjects: 'validate-injects'
     };
 
     var argv = require('yargs')
         .usage('$0 [options] config_path')
-        .demand(1, 1, 'single config file path required')
+        .demand(1, 1, "single config file path required")
         .option(OPTIONS.validateOnly, {
-            describe: 'load and validate modules structure, do not write anything',
+            describe: "load and validate modules structure, do not write anything",
             default: false
+        })
+        .option(OPTIONS.validateInjects, {
+            describe: "validate providers/services/etc. injects - provider's module must include modules of all injected providers",
+            default: true
         })
         .argv;
 
@@ -47,7 +52,7 @@
     validateConfig(config);
 
     var modulesStructure = buildModules(config);
-    var injectsErrors = modulesBuilder.validateInjects(modulesStructure);
+    var injectsErrors = argv[OPTIONS.validateInjects] ? modulesBuilder.validateInjects(modulesStructure) : [];
     var circular = modulesBuilder.findCircularReference(modulesStructure);
 
     if (argv[OPTIONS.validateOnly]) {
