@@ -1,20 +1,27 @@
 {
     "name": "angular-bundler",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "description": "Generate angular modules dependency tree and include scripts in html",
     "private": true,
-    "repository": "https://github.com/softaria/angular-bundler.git",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/softaria/angular-bundler.git"
+    },
     "author": "tsarev@softaria.com",
     "license": "MIT",
-    "bin": "./src/generator.js",
+    "main": "./src/bundler.js",
+    "bin": "./src/command-line.js",
     "dependencies": {
-        "glob": "*",
-        "yargs": "^4.3.0"
+        "glob": "^7.0.0",
+        "yargs": "^4.0.0"
     },
     "engines": {
         "node": ">=0.10.0"
     },
     "files": [
         "src"
-    ]
+    ],
+    "yargs": {
+        "boolean-negation": false
+    }
 }
