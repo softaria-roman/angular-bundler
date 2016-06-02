@@ -53,7 +53,8 @@ module.exports.writeImports = function(filePath, modules, staticImportsConfig) {
 
             return moduleCommentTemplate.replace('$', depName) +
                    '\n' +
-                   printImports(importEntries).js;
+                   printImports(importEntries).js +
+                   '\n';
         })
         .join('\n');
 
@@ -207,7 +208,7 @@ function printImports(imports) {
                     return null;
                 }
 
-                return printSingle(importEntry) + '\n';
+                return printSingle(importEntry);
             }
 
             if (importEntry instanceof ImportGroup) {
