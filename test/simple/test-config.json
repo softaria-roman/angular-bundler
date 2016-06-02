@@ -1,33 +1,36 @@
 {
-    "js": [
-        {
-            "dir": "test/simple",
-            "mapping": ["test/simple", "/testPrefix"]
-        }
-    ],
-    "html": [
-        "test/simple/test.html"
-    ],
-    "static": {
-        "vendor": [
-            "test/simple/vendor/vendor1.js",
-            {
-                "Vendor 2": "test/simple/vendor/vendor2.js"
-            },
-            {
-                "Vendor 3": [
-                    "test/simple/vendor/vendor3.js",
-                    "test/simple/vendor/vendor4.js+async"
-                ]
-            }
-        ],
-        "js": [
-            {
-                "Static 1": [
-                    "test/simple/js/static1.js"
-                ]
-            },
-            "test/simple/js/static2.js"
-        ]
+  "js": [
+    {
+      "dir": "test/simple",
+      "mapping": {
+        "test/simple": "/testPrefix"
+      }
     }
+  ],
+  "html": [
+    "test/simple/test.html"
+  ],
+  "static": {
+    "vendor": [
+      "test/simple/vendor/vendor1.js",
+      {
+        "Vendor 2": "test/simple/vendor/vendor2.js"
+      },
+      {
+        "Vendor 3": [
+          "test/simple/vendor/vendor3.js",
+          "test/simple/vendor/vendor4.js+async",
+          "test/simple/vendor/vendor3.css"
+        ]
+      }
+    ],
+    "js": [
+      {
+        "Static 1": [
+          "test/simple/js/static1.js"
+        ]
+      },
+      "test/simple/js/static2.js"
+    ]
+  }
 }

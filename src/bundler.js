@@ -88,8 +88,8 @@ function validateConfig(config) {
         if (!jsConfig.dir) {
             throw Error("Directory path is missing in entry " + index + " of 'js' part of config");
         }
-        if (jsConfig.mapping && (!util.isArray(jsConfig.mapping) || !jsConfig.mapping.length === 2)) {
-            throw Error("Wrong file path mapping in entry " + index + " of 'js' part of config - expected 2-element array");
+        if (jsConfig.mapping && (!(typeof jsConfig.mapping === 'object')) && Object.keys(jsConfig.mapping).length !== 1) {
+            throw Error("Wrong file path mapping in entry " + index + " of 'js' part of config - expected object with 1 field");
         }
     });
 }
@@ -110,9 +110,12 @@ function buildModules(config) {
         });
 
         if (dirConfig && dirConfig.length === 1) {
-            var replacement = dirConfig[0].mapping;
+            var replacementConfig = dirConfig[0].mapping;
+            var from = Object.keys(replacementConfig);
+            var to = replacementConfig[from];
+
             return filename
-                .replace(replacement[0], replacement[1])
+                .replace(from, to)
                 .replace(/\/\//, '/');
         } else {
             return filename;
@@ -126,7 +129,7 @@ function buildModules(config) {
  * @typedef {Object} BundlerConfig
  * @property {Array<JsConfig>} js
  * @property {Array<string>} html
- * @property {StaticConfig | Object<string, StaticConfig>} static
+ * @property {StaticImportConfig | Object<string, StaticImportConfig>} static
  * @property {boolean} validateProviderConstructor
  * @property {boolean} strictDependenciesMode
  */
@@ -134,5 +137,5 @@ function buildModules(config) {
 /**
  * @typedef {Object} JsConfig
  * @property {string} dir
- * @property {string[]} mapping
+ * @property {Object<string, string>} mapping
  */

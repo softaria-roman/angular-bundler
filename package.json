@@ -1,27 +1,28 @@
 {
-    "name": "angular-bundler",
-    "version": "1.0.0",
-    "description": "Generate angular modules dependency tree and include scripts in html",
-    "private": true,
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/softaria/angular-bundler.git"
-    },
-    "author": "tsarev@softaria.com",
-    "license": "MIT",
-    "main": "./src/bundler.js",
-    "bin": "./src/command-line.js",
-    "dependencies": {
-        "glob": "^7.0.0",
-        "yargs": "^4.0.0"
-    },
-    "engines": {
-        "node": ">=0.10.0"
-    },
-    "files": [
-        "src"
-    ],
-    "yargs": {
-        "boolean-negation": false
-    }
+  "name": "angular-bundler",
+  "version": "1.0.0",
+  "description": "Generate angular modules dependency tree and include scripts in html",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/softaria/angular-bundler.git"
+  },
+  "author": "tsarev@softaria.com",
+  "license": "MIT",
+  "main": "./src/bundler.js",
+  "bin": "./src/command-line.js",
+  "dependencies": {
+    "glob": "^7.0.0",
+    "yargs": "^4.0.0",
+    "js-beautify": "https://github.com/spontaliku-softaria/js-beautify.git"
+  },
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "files": [
+    "src"
+  ],
+  "yargs": {
+    "boolean-negation": false
+  }
 }
